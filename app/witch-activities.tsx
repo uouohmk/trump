@@ -1,6 +1,7 @@
 'use client';
 import {useState} from 'react';
-export type StoryCard={title:string,symbol:string,text:string,note?:string,kind?:string,image?:string,expression?:string,signIds?:string[],counts?:number[],planets?:{name:string,symbol:string,longitude:number}[]};
+export type PlanetInsight={name:string,domain:string,status:string,title:string,text:string,action:string,position:string,note:string,expression:string,longitude:number,natalRange:number[],angle:number|null,orb:number|null};
+export type StoryCard={title:string,symbol:string,text:string,note?:string,kind?:string,image?:string,expression?:string,signIds?:string[],counts?:number[],planets?:{name:string,symbol:string,longitude:number}[],insights?:PlanetInsight[]};
 export type Story={id:string,kind:string,result:{title:string,cards:StoryCard[],date:string,guide:string}};
 const newPerson=()=>({name:'',year:'',month:'',day:'',hour:'',minute:'0',unknown:true,calendar:'solar',leap:false,zone:'Asia/Seoul'});
 export default function WitchActivities({kind,onBack,onStory}:{kind:'question'|'compatibility'|'tarot'|'history',onBack:()=>void,onStory:(story:Story)=>void}){
@@ -20,7 +21,7 @@ export default function WitchActivities({kind,onBack,onStory}:{kind:'question'|'
   {kind==='history'?<><p>최근에 저장한 질문과 궁합, 타로를 다시 볼 수 있어요.</p>{history===null?<button className="primary" onClick={loadHistory} disabled={busy}>기록 불러오기</button>:history.length?<div className="history-list">{history.map(item=><button key={item.id} onClick={()=>onStory(item)}>{item.result.title}<span>이어서 보기 →</span></button>)}</div>:<p>아직 저장한 이야기가 없어요.</p>}</>:
    <form onSubmit={e=>{e.preventDefault();void submit();}}>
     {kind==='compatibility'?<>
-      <p className="activity-help">나는 저장한 출생 정보로 볼게요. 함께 볼 사람을 추가해 주세요.</p>
+      <p className="activity-help">내 사주는 저장한 출생 정보로 확인해요. 궁합을 볼 상대의 정보를 입력해 주세요.</p>
       <label>어떤 관계인가요?<select value={relationship} onChange={e=>setRelationship(e.target.value)}>{['연인','친구','가족','동료'].map(x=><option key={x}>{x}</option>)}</select></label>
       {people.map((p,i)=><fieldset key={i} className="partner" disabled={busy}><legend>상대 {i+1}</legend><label>이름 또는 별명<input type="text" value={p.name} maxLength={20} placeholder={`상대 ${i+1}`} onChange={e=>personChange(i,'name',e.target.value)}/></label>
        <div className="date-row">{(['year','month','day'] as const).map((key,j)=><label key={key}>{['태어난 해','월','일'][j]}<input type="number" inputMode="numeric" min={j?1:1900} max={[2049,12,31][j]} required value={p[key]} placeholder={['1995','6','15'][j]} onChange={e=>personChange(i,key,e.target.value)}/></label>)}</div>
@@ -36,7 +37,7 @@ export default function WitchActivities({kind,onBack,onStory}:{kind:'question'|'
      </>}
     {error&&<p role="alert" className="error">{error}</p>}
     {kind==='tarot'?<div className="draw-deck">{[0,1,2].map(i=><button key={i} type="button" className="tarot-back" aria-label={`${i+1}번째 카드 뽑기`} disabled={busy} onClick={()=>submit(i)}><span aria-hidden="true">☾</span><small>{busy?'펼치는 중…':'카드 뽑기'}</small></button>)}</div>:<button className="primary full" disabled={busy}>{busy?'마녀가 이야기를 읽는 중…':kind==='compatibility'?'함께 궁합 보기':'마녀의 답변 듣기'}</button>}
-    <p className="play-note">{kind==='tarot'?'재미로 보는 타로예요. 무작위로 뽑은 카드의 전통적인 의미로 답해요.':'재미로 보는 전통 운세예요. 실제 계산값에 정해진 해석 문장을 연결해 답해요.'}</p>
+    <p className="play-note">{kind==='tarot'?'재미로 보는 타로예요. 무작위로 뽑은 카드에 담긴 뜻을 알려드려요.':'출생 정보와 천체 위치에 맞춰 미리 준비한 해석을 보여드려요. 재미로 가볍게 즐겨 주세요.'}</p>
    </form>}
  </section>;
 }

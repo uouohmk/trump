@@ -18,7 +18,7 @@ export async function consult(owner:string,raw:any){
   const intent=questionIntent(question,raw.intent);
   if(intent==='highstakes')cards=fortuneCards(profile.chart,profile.snapshot.signIndex,profile.snapshot.planets,profile.snapshot.date,question,raw.intent);
   else{const random=crypto.getRandomValues(new Uint32Array(1))[0],index=random%22;
-   cards=[{title:TAROT[index][0],symbol:String(index),image:`/assets/tarot/${String(index).padStart(2,'0')}.jpg`,kind:'tarot',text:question?`“${question}”에 뽑힌 카드는 ${TAROT[index][0]}예요. ${TAROT[index][1]}`:TAROT[index][1],note:'라이더 웨이트 스미스 · 정방향',expression:[13,15,16,18].includes(index)?'reassure':'happy'},
+   cards=[{title:TAROT[index][0],symbol:String(index),image:`/assets/tarot/${String(index).padStart(2,'0')}.jpg`,kind:'tarot',text:`${TAROT[index][0]} 카드가 나왔어요. ${question?'떠올린 질문과 함께 카드의 조언을 살펴볼게요.':'이 카드가 어떤 조언을 하는지 살펴볼게요.'}`,note:'라이더 웨이트 스미스 · 정방향',expression:[13,15,16,18].includes(index)?'reassure':'happy'},
    {title:'이 카드로 해 볼 일',symbol:'✧',text:TAROT[index][1],expression:'thoughtful',note:'새로 뽑을 때 무작위로 한 장을 골라요. 미래를 보장하는 답은 아니에요.'}];}
   input={question,selection:raw.selection};title=question||'마녀의 타로';
  }else{

@@ -1,0 +1,38 @@
+.world>section,.world>.consultation-space{transition:opacity .18s ease,filter .18s ease}
+.world.scene-leaving>section,.world.scene-leaving>.consultation-space{opacity:0;filter:blur(2px);pointer-events:none}
+.room-background{transition:filter .9s ease,transform 1.2s ease}
+.input-panel,.entry-panel,.activity-panel{animation:scene-in .5s ease both}
+.speech,.planet-caption{animation:scene-in .55s ease both}
+.revealed-card{animation:card-arrive .65s cubic-bezier(.2,.7,.2,1) both}
+.topic-card{animation:card-arrive .7s cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(var(--card-index) * 95ms + 140ms)}
+.topic-card:hover{translate:0 -7px}
+.constellation-star{animation:star-arrive .45s ease both}
+.constellation-line{stroke-dasharray:1;stroke-dashoffset:1;animation:constellation-draw 1s ease forwards}
+.sky-map .planet{animation:scene-in .6s ease both}
+.sky-map .natal-direction line{stroke:#ecd18b;stroke-width:1;opacity:.65}
+.sky-map .natal-direction circle{fill:#ecd18b;stroke:#fff3c9}
+.planet-buttons button{display:flex;flex-direction:column;align-items:center;flex:1 1 28%;max-width:150px}
+.planet-buttons small{font-size:.67rem;color:var(--muted)}
+.aspect-status{display:inline-block;color:var(--muted);font-size:.8rem;margin-top:.4rem}
+.status-support{color:#b9dda7}.status-adjust{color:#efc0a3}.status-focus{color:var(--gold)}
+.aspect-evidence{font-size:.8rem;text-align:left;max-width:340px;margin:.5rem auto 0;color:var(--muted)}
+.aspect-evidence p{margin:.6rem 0}.speaker-topic{color:var(--muted)}
+.arrival-scene{position:relative;isolation:isolate;overflow:hidden;width:min(780px,calc(100% - 40px));height:min(640px,78svh);min-height:380px;margin:2rem auto 0;border:1px solid #aa8454;background:radial-gradient(ellipse at 50% 65%,#52314b,#17101f 70%);box-shadow:0 0 0 5px #201625,0 30px 70px #0008}
+.arrival-glow{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 55%,#eac19a33,transparent 65%);animation:scene-in 1.8s ease both}
+.arrival-witch{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;animation:witch-arrive 1.7s .3s ease both}
+.arrival-witch .witch-portrait{width:clamp(180px,35vw,310px);height:clamp(180px,35vw,310px);border:0;background-color:transparent;box-shadow:0 0 55px #e1b18e12;mask-image:linear-gradient(#000 85%,transparent)}
+.arrival-witch h1{font-size:1.8rem;margin-top:.2rem}.arrival-witch p{margin-top:.4rem;color:var(--muted)}
+.curtain{position:absolute;z-index:2;top:0;bottom:0;width:51%;background:repeating-linear-gradient(90deg,#23132d 0%,#4a244d 12%,#60365b 22%,#2e1738 34%,#24132e 38%);border-bottom:9px double #b78a55;box-shadow:inset -12px 0 22px #10081399,0 15px 35px #0008}
+.curtain::after{content:'';position:absolute;inset:0;background:linear-gradient(#100a18aa,transparent 30%,#160d2377)}
+.curtain-left{left:0;border-right:4px solid #ad8458;transform-origin:left top;animation:curtain-left-open 1.65s .15s cubic-bezier(.4,0,.2,1) both}
+.curtain-right{right:0;border-left:4px solid #ad8458;transform-origin:right top;animation:curtain-right-open 1.65s .15s cubic-bezier(.4,0,.2,1) both}
+.arrival-skip{position:absolute;z-index:3;bottom:16px;left:50%;transform:translateX(-50%);white-space:nowrap;background:#170f21bb}
+@keyframes scene-in{from{opacity:0;filter:blur(2px)}to{opacity:1;filter:blur(0)}}
+@keyframes card-arrive{from{opacity:0;transform:translateY(32px) scale(.84)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes star-arrive{from{opacity:0;transform:scale(.1)}70%{opacity:1;transform:scale(1.4)}to{opacity:1;transform:scale(1)}}
+@keyframes constellation-draw{to{stroke-dashoffset:0}}
+@keyframes witch-arrive{from{opacity:0;transform:scale(.88) translateY(24px)}to{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes curtain-left-open{from{transform:translateX(0)}to{transform:translateX(-91%) skewY(-3deg)}}
+@keyframes curtain-right-open{from{transform:translateX(0)}to{transform:translateX(91%) skewY(3deg)}}
+@media(max-width:700px){.arrival-scene{margin-top:1.3rem;height:65svh}.arrival-witch h1{font-size:1.5rem}.speaker-topic{display:block;margin-top:.2rem}.aspect-evidence{font-size:.75rem}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.constellation-line{stroke-dashoffset:0}.curtain{display:none}.topic-card:hover{translate:none}.world.scene-leaving>section,.world.scene-leaving>.consultation-space{opacity:1;filter:none}}

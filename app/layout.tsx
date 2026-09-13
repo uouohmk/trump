@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./witch.css";
+import "./motion.css";
 
 export const metadata: Metadata = {
   title: "별빛 상담실",

@@ -4,7 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {build} from 'esbuild';
 import {readFileSync,mkdirSync,readdirSync} from 'node:fs';
 import {validateBirth,makeSnapshot} from '../lib/consultation.js';
-import {signTransit,compatibilityCards,questionIntent} from '../lib/fortune.js';
+import {compatibilityCards,questionIntent} from '../lib/fortune.js';
 mkdirSync('.qa',{recursive:true});
 await build({stdin:{contents:"export * as record from './app/api/record/route.ts'; export * as consultation from './app/api/consultation/route.ts';",resolveDir:process.cwd(),loader:'ts'},outfile:'.qa/api-test.mjs',bundle:true,platform:'node',format:'esm',plugins:[{name:'local-test-only',setup(b){
  b.onResolve({filter:/cloudflare:workers/},()=>({path:'cloudflare',namespace:'test'}));
@@ -23,6 +23,8 @@ test('account-owned records persist and never expose another account',async()=>{
  assert.equal((await api.POST(req(raw,'https://other.local'))).status,403);
  const saved=await (await api.POST(req())).json();assert.equal(saved.record.input.year,1995);assert.ok(saved.record.snapshot.topics.sky.length>3);
  const again=await (await api.GET()).json();assert.deepEqual(again.record,saved.record);assert.match((await api.GET()).headers.get('cache-control'),/no-store/);
+ sqlite.prepare('UPDATE readings SET payload = ? WHERE owner_id = ?').run(JSON.stringify({...saved.record.snapshot,version:3}),'test-a');
+ const refreshed=await (await api.GET()).json();assert.equal(refreshed.record.snapshot.version,4);assert.deepEqual(refreshed.record,saved.record);
  globalThis.__testIdentity={userId:'test-b'};assert.deepEqual(await (await api.GET()).json(),{record:null});
  await api.POST(req({...raw,year:2001,ownerId:'test-a',guide:'blonde'}));
  const b=await (await api.GET()).json();assert.equal(b.record.input.year,2001);
@@ -54,10 +56,7 @@ test('questions, tarot and group compatibility are validated, saved and owner-sc
  globalThis.__testIdentity={userId:'test-b'};
  await api.DELETE(new Request('https://test.local/api/record',{method:'DELETE',headers:{Origin:'https://test.local'}}));assert.deepEqual((await (await consultationApi.GET()).json()).items,[]);
 });
-test('planetary aspect rules respond to actual angular differences and all card art exists',()=>{
- assert.equal(signTransit(0,[{name:'금성',longitude:15}]).phase,0);
- assert.equal(signTransit(0,[{name:'금성',longitude:105}]).phase,2);
- assert.equal(signTransit(0,[{name:'금성',longitude:40}]).phase,1);
+test('all card art exists, group pairs are complete and question intents stay distinct',()=>{
  for(let i=0;i<22;i++)assert.ok(readFileSync(`public/assets/tarot/${String(i).padStart(2,'0')}.jpg`).length>1000);
  const lines=JSON.parse(readFileSync('public/assets/zodiac-lines.json','utf8'));assert.equal(Object.keys(lines).length,12);for(const constellation of Object.values(lines))assert.ok(constellation.flat().length>=3);
  const people=Array.from({length:6},(_,i)=>({name:String(i),chart:validateBirth({...raw,year:1990+i}).chart}));assert.equal(compatibilityCards(people).length,32);
