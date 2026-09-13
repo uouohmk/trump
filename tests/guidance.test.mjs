@@ -4,6 +4,7 @@ import {aspectAt,natalSunRange,planetReadings,focusReading} from '../lib/celesti
 import {tenGod,sajuDailyCards} from '../lib/saju-guidance.js';
 import {makeSnapshot,validateBirth} from '../lib/consultation.js';
 import {STEMS} from '../lib/engine.js';
+import {fortuneCards} from '../lib/fortune.js';
 
 test('angles wrap at 360; conjunction is focus, not automatically good; orb boundaries are inclusive',()=>{
  assert.equal(aspectAt(1,359).status,'focus');
@@ -22,6 +23,8 @@ test('every planet carries a distinct domain and uses the natal Sun, including u
  assert.equal(new Set(readings.map(p=>p.domain)).size,6);
  assert.ok(readings.every(p=>p.status==='support'));
  assert.equal(focusReading(readings,'love').name,'달');
+ const money=fortuneCards(chart,2,[{name:'금성',longitude:(sun+120)%360}],'2026-09-13','오늘 지출을 줄이려면?','money');
+ assert.match(money[1].text,/할인|지출|물건/);assert.doesNotMatch(money[1].text,/안부|가까워져/);
  const unknown=validateBirth({...birth,unknown:true}).chart;
  const range=natalSunRange(unknown);
  assert.ok(range[1]>range[0]&&range[1]-range[0]<1.2);
