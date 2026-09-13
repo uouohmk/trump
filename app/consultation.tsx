@@ -1,7 +1,11 @@
 'use client';
 import {useState,useEffect,useRef} from 'react';
+import {flushSync} from 'react-dom';
 import {koreanDate,nextMidnight} from '../lib/engine.js';
 import WitchActivities,{WitchPortrait,Story,StoryCard,PlanetInsight} from './witch-activities';
+import {createSessionRecord} from '../lib/session-reading.js';
+import {makeSnapshot} from '../lib/consultation.js';
+import {assetPath} from '../lib/asset-path.js';
 import zodiacLines from '../public/assets/zodiac-lines.json';
 type Topic='sky'|'flow'|'work'|'saju'|'tarot'|'compatibility';
 type Planet={name:string,symbol:string,longitude:number};
@@ -10,8 +14,8 @@ type Birth={year:number,month:number,day:number,hour:number|null,minute:number|n
 type RecordData={version:string,input:Birth,chart:{rules:string,source:string,unknown:boolean,boundary:boolean},guide:string,snapshot:{date:string,topics:Record<Topic,Card[]>}};
 const topics:{id:Topic,label:string,icon:string}[]=[{id:'sky',label:'별자리',icon:'☉'},{id:'flow',label:'오늘 운세',icon:'✧'},{id:'work',label:'일',icon:'◇'},{id:'saju',label:'사주',icon:'四'},{id:'tarot',label:'타로',icon:'✦'},{id:'compatibility',label:'궁합',icon:'♡'}];
 const blank={year:'',month:'',day:'',hour:'',minute:'0',calendar:'solar',leap:false,unknown:true,zone:'Asia/Seoul'};
-export default function Consultation({signedIn,signIn,signOut}:{signedIn:boolean,signIn:string,signOut:string}){
- type Stage='gate'|'login'|'input'|'arrival'|'choose'|'reading'|'activity';
+export default function Consultation(){
+ type Stage='gate'|'input'|'arrival'|'choose'|'reading'|'activity';
  const [stage,setStageNow]=useState<Stage>('gate');
  const [leaving,setLeaving]=useState(false);
  const motionTimer=useRef<ReturnType<typeof setTimeout>|null>(null),motionLock=useRef(false);
@@ -30,21 +34,13 @@ export default function Consultation({signedIn,signIn,signOut}:{signedIn:boolean
  },[stage]);
  const [form,setForm]=useState(blank),[guide,setGuide]=useState('dark');
  const [record,setRecord]=useState<RecordData|null>(null),[topic,setTopic]=useState<Topic>('flow'),[step,setStep]=useState(0);
- const [busy,setBusy]=useState(false),[error,setError]=useState(''),[settings,setSettings]=useState(false),[confirmDelete,setConfirmDelete]=useState(false);
- const [activity,setActivity]=useState<'question'|'compatibility'|'tarot'|'history'>('question'),[story,setStory]=useState<Story|null>(null);
+ const [busy,setBusy]=useState(false),[error,setError]=useState(''),[settings,setSettings]=useState(false);
+ const [activity,setActivity]=useState<'question'|'compatibility'|'tarot'>('question'),[story,setStory]=useState<Story|null>(null);
  const [renewed,setRenewed]=useState(false),[planet,setPlanet]=useState(0);
  const heading=useRef<HTMLHeadingElement>(null),settingsRef=useRef<HTMLDialogElement>(null);
  const fresh=useRef({stage,record,topic,step});fresh.current={stage,record,topic,step};
  function applyRecord(value:RecordData){setRecord(value);setGuide(value.guide);setForm({...value.input,year:String(value.input.year),month:String(value.input.month),day:String(value.input.day),hour:value.input.hour===null?'':String(value.input.hour),minute:value.input.minute===null?'0':String(value.input.minute)});}
- async function api(method='GET',body?:unknown){
-  const response=await fetch('/api/record',{method,cache:'no-store',headers:body?{'Content-Type':'application/json'}:undefined,body:body?JSON.stringify(body):undefined});
-  const data=await response.json() as {record:RecordData|null,error?:string,deleted?:boolean};if(!response.ok){if(response.status===401)setStage('login');throw new Error(data.error||'다시 시도해 주세요.');}return data;
- }
- async function enter(){
-  setError('');if(!signedIn){setStage('login');return;}
-  setBusy(true);try{const data=await api();if(data.record)applyRecord(data.record);setStage('input');}catch(e){setError((e as Error).message);}finally{setBusy(false);}
- }
- useEffect(()=>{if(signedIn&&new URLSearchParams(location.search).get('enter')==='1'){history.replaceState({},'','/');void enter();}},[]);
+ function enter(){setError('');setStage('input');}
  useEffect(()=>{if(stage!=='gate')heading.current?.focus();},[stage,step,topic]);
  useEffect(()=>{const dialog=settingsRef.current;if(settings)dialog?.showModal();else dialog?.close();},[settings]);
  useEffect(()=>{
@@ -52,7 +48,7 @@ export default function Consultation({signedIn,signIn,signOut}:{signedIn:boolean
   async function refresh(){
    const current=fresh.current.record;
    if(current&&current.snapshot.date!==koreanDate()){
-    try{const data=await api();if(data.record){applyRecord(data.record);setRenewed(true);setStep(0);}else{setRecord(null);setStage('input');}}catch(e){setError((e as Error).message);}
+    try{setRecord({...current,snapshot:makeSnapshot(current.chart,koreanDate())} as unknown as RecordData);setRenewed(true);setStep(0);}catch(e){setError((e as Error).message);}
    }
    clearTimeout(timer);timer=setTimeout(refresh,Math.max(100,nextMidnight()-Date.now()+100));
   }
@@ -61,24 +57,34 @@ export default function Consultation({signedIn,signIn,signOut}:{signedIn:boolean
   return()=>{clearTimeout(timer);document.removeEventListener('visibilitychange',visible);window.removeEventListener('focus',visible);};
  },[record?.version]);
  function openTopic(value:Topic){transition(()=>{setStory(null);setTopic(value);setStep(0);setPlanet(0);setRenewed(false);if(value==='tarot'||value==='compatibility'){setActivity(value);setStageNow('activity');}else setStageNow('reading');});}
- function openActivity(value:'question'|'compatibility'|'tarot'|'history'){transition(()=>{setStory(null);setActivity(value);setStageNow('activity');setError('');});}
+ function openActivity(value:'question'|'compatibility'|'tarot'){transition(()=>{setStory(null);setActivity(value);setStageNow('activity');setError('');});}
  function showStory(value:Story){transition(()=>{setStory(value);setGuide(value.result.guide);setStep(0);setStageNow('reading');});}
  useEffect(()=>{
   const context=(document as any).modelContext;if(!context?.registerTool)return;
   const lifecycle=new AbortController();
-  Promise.resolve(context.registerTool({name:'open_consultation_topic',description:'저장한 기록의 별자리, 오늘의 운세, 일, 사주 카드 또는 타로 뽑기·다인 궁합 입력으로 이동합니다. 먼저 입장하고 출생 정보를 저장해야 합니다.',inputSchema:{type:'object',properties:{topic:{type:'string',enum:topics.map(x=>x.id)}},required:['topic'],additionalProperties:false},annotations:{readOnlyHint:false},execute:async(input:any)=>{
+  Promise.resolve(context.registerTool({name:'open_consultation_topic',description:'이번 상담의 별자리, 오늘의 운세, 일, 사주 카드 또는 타로 뽑기·다인 궁합 입력으로 이동합니다. 먼저 입장하고 출생 정보를 입력해야 합니다.',inputSchema:{type:'object',properties:{topic:{type:'string',enum:topics.map(x=>x.id)}},required:['topic'],additionalProperties:false},annotations:{readOnlyHint:false},execute:async(input:any)=>{
    if(!input||Object.keys(input).length!==1||!topics.some(t=>t.id===input.topic))throw new Error('올바른 카드 주제를 선택해 주세요.');
-   if(!fresh.current.record||!['choose','reading'].includes(fresh.current.stage))throw new Error('먼저 입장하고 출생 정보를 저장해 주세요.');
+   if(!fresh.current.record||!['choose','reading'].includes(fresh.current.stage))throw new Error('먼저 입장하고 출생 정보를 입력해 주세요.');
    openTopic(input.topic);await new Promise(resolve=>requestAnimationFrame(resolve));return {topic:input.topic,stage:['tarot','compatibility'].includes(input.topic)?'input':'reading'};
   }},{signal:lifecycle.signal})).catch(()=>{});
   return()=>lifecycle.abort();
  },[]);
  async function save(event:React.FormEvent){
   event.preventDefault();setBusy(true);setError('');
-  try{const data=await api('POST',{...form,year:Number(form.year),month:Number(form.month),day:Number(form.day),hour:form.unknown?null:Number(form.hour),minute:form.unknown?null:Number(form.minute),guide});if(!data.record)throw new Error('저장 결과를 확인하지 못했어요. 다시 시도해 주세요.');applyRecord(data.record);setStage('arrival');}
+  try{const value=createSessionRecord({...form,year:Number(form.year),month:Number(form.month),day:Number(form.day),hour:form.unknown?null:Number(form.hour),minute:form.unknown?null:Number(form.minute),guide});applyRecord(value as unknown as RecordData);setStage('arrival');}
   catch(e){setError((e as Error).message);}finally{setBusy(false);}
  }
- async function remove(){setBusy(true);setError('');try{await api('DELETE');setRecord(null);setForm(blank);setSettings(false);setConfirmDelete(false);setStage('input');}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
+ function clearSession(){
+  if(motionTimer.current)clearTimeout(motionTimer.current);motionLock.current=false;setLeaving(false);
+  setRecord(null);setForm({...blank});setStory(null);setGuide('dark');setTopic('flow');setActivity('question');setStep(0);setPlanet(0);setSettings(false);setError('');setBusy(false);setRenewed(false);setStageNow('gate');
+ }
+ useEffect(()=>{
+  // Drop transient inputs when leaving, including the browser's back/forward cache.
+  const onHide=()=>flushSync(clearSession);
+  const onShow=(event:PageTransitionEvent)=>{if(event.persisted)onHide();};
+  window.addEventListener('pagehide',onHide);window.addEventListener('pageshow',onShow);
+  return()=>{window.removeEventListener('pagehide',onHide);window.removeEventListener('pageshow',onShow);};
+ },[]);
  const activeCards=story?.result.cards||record?.snapshot.topics[topic]||[];
  const card=activeCards[step];
  const insight=card?.kind==='map'?card.insights?.[planet]:undefined;
@@ -91,11 +97,10 @@ export default function Consultation({signedIn,signIn,signOut}:{signedIn:boolean
     <div className="gate-title"><p className="small-star" aria-hidden="true">✦</p><h1>별빛 상담실</h1></div>
     <div className="gate-action"><button className="primary enter" onClick={enter} disabled={busy}>{busy?'기록을 확인하는 중…':'상담 준비하기'}<span aria-hidden="true">→</span></button>{error&&<p role="alert" className="error">{error}</p>}</div>
   </section>:<>
-   <header className="room-header"><button className="wordmark" onClick={()=>{setStage('gate');setError('');}}>별빛 상담실</button><div>{record&&<button className="quiet" onClick={()=>setSettings(true)}>내 기록</button>}<button className="quiet" onClick={()=>{setStage('gate');setError('');}}>나가기</button></div></header>
-   {stage==='login'&&<section className="entry-panel panel"><span className="section-mark">✦</span><h1 ref={heading} tabIndex={-1}>먼저 상담을 준비할게요.</h1><p>로그인하면 다른 기기에서도<br/>나의 기록을 이어 볼 수 있어요.</p><a className="primary" href={signIn} target="_top">ChatGPT로 로그인</a></section>}
+   <header className="room-header"><button className="wordmark" onClick={clearSession}>별빛 상담실</button><div>{record&&<button className="quiet" onClick={()=>setSettings(true)}>정보 관리</button>}<button className="quiet" onClick={clearSession}>상담 끝내기</button></div></header>
    {stage==='input'&&<section className="input-panel panel">
     <p className="eyebrow">입장 전, 나의 정보</p><h1 ref={heading} tabIndex={-1}>언제 태어났나요?</h1>
-    <form onSubmit={save}>
+    <form onSubmit={save} autoComplete="off">
      <fieldset disabled={busy}><legend className="sr-only">출생 정보</legend>
       <div className="calendar-row"><label>달력<select value={form.calendar} onChange={e=>setForm({...form,calendar:e.target.value,leap:false})}><option value="solar">양력</option><option value="lunar">음력</option></select></label>{form.calendar==='lunar'&&<label className="check"><input type="checkbox" checked={form.leap} onChange={e=>setForm({...form,leap:e.target.checked})}/>윤달</label>}</div>
       <div className="date-row">{(['year','month','day'] as const).map((key,i)=><label key={key}>{['태어난 해','월','일'][i]}<input inputMode="numeric" type="number" required min={i?1:1900} max={[2049,12,31][i]} placeholder={['1995','6','15'][i]} value={form[key]} onChange={e=>setForm({...form,[key]:e.target.value})}/></label>)}</div>
@@ -104,23 +109,23 @@ export default function Consultation({signedIn,signIn,signOut}:{signedIn:boolean
       <details className="birth-options"><summary>해외에서 태어났어요</summary><label>출생 지역<select value={form.zone} onChange={e=>setForm({...form,zone:e.target.value})}><option value="Asia/Seoul">대한민국</option><option value="Asia/Tokyo">일본</option><option value="Asia/Shanghai">중국</option><option value="America/New_York">미국 동부</option><option value="America/Los_Angeles">미국 서부</option><option value="Europe/London">영국</option><option value="Europe/Paris">프랑스</option><option value="Australia/Sydney">호주 시드니</option></select></label></details>
       <fieldset className="guide-choice"><legend>누구와 이야기할까요?</legend>{['dark','blonde'].map(value=><label key={value} className={guide===value?'selected':''}><input type="radio" name="guide" value={value} checked={guide===value} onChange={()=>setGuide(value)}/><WitchPortrait guide={value} small/><span>{value==='dark'?'흑발 마녀':'금발 마녀'}</span></label>)}</fieldset>
      </fieldset>
-     <p className="save-note">출생 정보와 결과는 내 계정에 저장돼요.</p>
+     <p className="save-note">출생 정보와 질문은 이 브라우저 안에서만 처리해요. 상담을 끝내거나 새로고침하면 지워져요.</p>
      {error&&<p className="error" role="alert">{error}</p>}
-     <button className="primary full" disabled={busy}>{busy?'기록을 만드는 중…':'저장하고 입장하기'}</button>
-     {record&&<button type="button" className="quiet full" onClick={()=>{applyRecord(record);setStage('arrival');}}>저장된 정보로 입장하기</button>}
+     <button className="primary full" disabled={busy}>{busy?'계산하는 중…':'입장하기'}</button>
+     {record&&<button type="button" className="quiet full" onClick={()=>{applyRecord(record);setStage('arrival');}}>이번 입력으로 돌아가기</button>}
     </form>
    </section>}
    {stage==='arrival'&&<section className="arrival-scene" aria-label="커튼이 열리는 상담실"><div className="arrival-glow" aria-hidden="true"/><div className="arrival-witch"><WitchPortrait guide={guide}/><h1 ref={heading} tabIndex={-1}>어서 오세요.</h1><p>당신의 이야기를 들려주세요.</p></div><div className="curtain curtain-left" aria-hidden="true"/><div className="curtain curtain-right" aria-hidden="true"/><button className="quiet arrival-skip" onClick={()=>setStage('choose')}>바로 이야기하기 →</button></section>}
-   {stage==='activity'&&record&&<WitchActivities key={activity} kind={activity} onBack={()=>setStage('choose')} onStory={showStory}/>}
+   {stage==='activity'&&record&&<WitchActivities key={activity} kind={activity} profile={record} onBack={()=>setStage('choose')} onStory={showStory}/>}
    {(stage==='choose'||stage==='reading')&&record&&<div className="consultation-space">
     <section className="table-area">
-     {stage==='choose'?<><p className="eyebrow">나의 카드</p><h1 ref={heading} tabIndex={-1}>어떤 이야기가 궁금한가요?</h1><div className="ask-actions"><button className="primary" onClick={()=>openActivity('question')}>마녀에게 직접 묻기</button><button className="quiet" onClick={()=>openActivity('history')}>지난 이야기</button></div><div className="topic-deck">{topics.map((item,i)=><button key={item.id} className="topic-card" onClick={()=>openTopic(item.id)} style={{'--card-index':i} as React.CSSProperties}><span className="card-corner">✦</span><span className="topic-icon" aria-hidden="true">{item.icon}</span><span>{item.label}</span><span className="card-bottom" aria-hidden="true">· ✦ ·</span></button>)}</div></>:
+     {stage==='choose'?<><p className="eyebrow">나의 카드</p><h1 ref={heading} tabIndex={-1}>어떤 이야기가 궁금한가요?</h1><div className="ask-actions"><button className="primary" onClick={()=>openActivity('question')}>마녀에게 직접 묻기</button></div><div className="topic-deck">{topics.map((item,i)=><button key={item.id} className="topic-card" onClick={()=>openTopic(item.id)} style={{'--card-index':i} as React.CSSProperties}><span className="card-corner">✦</span><span className="topic-icon" aria-hidden="true">{item.icon}</span><span>{item.label}</span><span className="card-bottom" aria-hidden="true">· ✦ ·</span></button>)}</div></>:
       <><div className="reading-nav"><button className="quiet" onClick={()=>setStage('choose')}>← 카드 선택</button><span>{story?'마녀의 답변':currentTopic.label} · {step+1}/{total}</span></div>
        <article className={`revealed-card ${card?.kind==='map'?'map-card':''}`} key={`${topic}-${step}`}>
         <span className="card-corner" aria-hidden="true">✦</span>
         <p className="eyebrow">{story?'마녀의 답변':currentTopic.label}</p>
         <h1 ref={heading} tabIndex={-1}>{card?.title}</h1>
-        {card?.image?<img className="tarot-art" src={card.image} alt={card.title+' 타로 카드'}/>:card?.kind==='sign'&&card.signIds?<Constellation ids={card.signIds}/>:card?.kind==='elements'&&card.counts?<ElementChart counts={card.counts}/>:card?.kind==='map'&&card.planets?<SkyMap planets={card.planets} selected={planet} onSelect={value=>transition(()=>setPlanet(value))} insights={card.insights}/>:<div className={`reading-symbol ${topic==='saju'?'hanja':''}`} aria-hidden="true">{card?.symbol}</div>}
+        {card?.image?<img className="tarot-art" src={assetPath(card.image)} alt={card.title+' 타로 카드'}/>:card?.kind==='sign'&&card.signIds?<Constellation ids={card.signIds}/>:card?.kind==='elements'&&card.counts?<ElementChart counts={card.counts}/>:card?.kind==='map'&&card.planets?<SkyMap planets={card.planets} selected={planet} onSelect={value=>transition(()=>setPlanet(value))} insights={card.insights}/>:<div className={`reading-symbol ${topic==='saju'?'hanja':''}`} aria-hidden="true">{card?.symbol}</div>}
         {card?.note&&<p className="card-note">{card.note}</p>}
        </article>
       </>}
@@ -133,13 +138,14 @@ export default function Consultation({signedIn,signIn,signOut}:{signedIn:boolean
     </section>
     {renewed&&<p role="status" className="update-note">오늘의 카드로 바뀌었어요.</p>}{error&&<p role="alert" className="error">{error}</p>}
    </div>}
-   <dialog ref={settingsRef} onCancel={()=>setSettings(false)} onClose={()=>{setSettings(false);setConfirmDelete(false);}} className="record-dialog panel">
-    <div className="dialog-title"><h2>내 기록</h2><button className="quiet" onClick={()=>setSettings(false)} aria-label="닫기">닫기</button></div>
-    <p>저장한 출생 정보와 카드는 같은 계정으로 로그인한 기기에서 확인할 수 있어요.</p>
+   <dialog ref={settingsRef} onCancel={()=>setSettings(false)} onClose={()=>{setSettings(false);}} className="record-dialog panel">
+    <div className="dialog-title"><h2>정보 관리</h2><button className="quiet" onClick={()=>setSettings(false)} aria-label="닫기">닫기</button></div>
+    <p>계정을 만들지 않아요. 출생 정보·질문·상담 결과는 서버, 쿠키, 브라우저 저장소에 보관하지 않아요. 이 창의 메모리에서만 사용해요.</p>
     <button className="primary full" onClick={()=>{setSettings(false);setStage('input');setError('');}}>출생 정보 수정</button>
     <details><summary>계산 기준과 출처</summary><p>{record?.chart.rules}</p><p>오늘의 카드는 한국 시간 자정에 바뀌어요. 같은 날에는 페이지를 다시 열어도 같은 운세를 볼 수 있어요.</p><p>천체 위치와 사주 글자는 입력한 정보로 계산해요. 운세와 궁합은 여기에 전통적인 의미를 붙여 미리 준비한 문장으로 설명해요. AI가 자유롭게 작성하는 답변은 아니에요.</p><p>태어난 시간을 모르면 시간에 해당하는 사주 글자를 정하지 않아요. 절기가 바뀌는 날에는 해나 달의 사주 글자도 하나로 정하기 어려울 수 있어요.</p><p><a href="https://github.com/cosinekitty/astronomy" target="_blank" rel="noreferrer">Astronomy Engine 2.1.19</a> · <a href="https://github.com/usingsky/korean_lunar_calendar_js" target="_blank" rel="noreferrer">Korean Lunar Calendar 0.4.0</a></p><p>별자리 그림은 d3-celestial 자료(BSD-3-Clause)를 사용해요. 운세에서 나누는 별자리 구간과 실제 별자리의 경계는 달라요. 그림은 같은 이름의 실제 별들을 연결한 모습이에요.</p><p>천체별 운세는 오늘의 태양·달·수성·금성·화성·목성과 태어났을 때 태양의 각도를 비교해요. 시간을 모르면 태어난 날의 위치 범위를 사용해요. 주요 각에서 6° 안에 있을 때만 해석하며, 상승궁이나 하우스는 계산하지 않아요.</p><p>행성의 의미와 각도 해석은 <a href="https://www.astro.com/astrology/in_planets1_e.htm" target="_blank" rel="noreferrer">Astrodienst의 행성 설명</a>과 <a href="https://www.astro.com/astrology/in_aspect_e.htm" target="_blank" rel="noreferrer">각도 설명</a>을 참고했어요. 사주의 오늘 조언은 태어난 날과 오늘의 첫 글자를 비교해요. 사주 전체나 장기 운세를 종합한 풀이는 아니에요.</p><p>타로 그림: Pamela Colman Smith, Rider–Waite–Smith, Wikimedia Commons 공개 영역 원본.</p></details>
-    {confirmDelete?<div className="delete-confirm"><p>출생 정보와 저장한 카드 기록을 모두 지울까요?</p><button onClick={remove} disabled={busy}>모두 지우기</button><button className="quiet" onClick={()=>setConfirmDelete(false)}>취소</button></div>:<button className="quiet full" onClick={()=>setConfirmDelete(true)}>기록 지우기</button>}
-    {error&&<p role="alert" className="error">{error}</p>}<a className="quiet signout" href={signOut} target="_top">로그아웃</a>
+    <details><summary>개인정보 처리 안내</summary><p>입력 내용은 서버로 보내지 않으며 상담 종료·새로고침·페이지 이탈 시 초기화해요. 다른 기기에서 이어 보거나 지난 상담을 불러오는 기능은 제공하지 않아요.</p><p>사이트 파일을 전달하는 호스팅 서비스는 IP 주소 등 접속 기록을 처리할 수 있어요. 이것은 출생 정보나 상담 내용의 저장과는 별개예요.</p></details>
+    <button className="primary full" onClick={clearSession}>입력 지우고 상담 끝내기</button>
+
    </dialog>
   </>}
  </main>;
