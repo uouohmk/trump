@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {build} from 'esbuild';
 import {readFileSync,mkdirSync,readdirSync} from 'node:fs';
-import {validateBirth,makeSnapshot} from '../lib/consultation.js';
+import {validateBirth,makeSnapshot,SNAPSHOT_VERSION} from '../lib/consultation.js';
 import {compatibilityCards,questionIntent} from '../lib/fortune.js';
 mkdirSync('.qa',{recursive:true});
 await build({stdin:{contents:"export * as record from './app/api/record/route.ts'; export * as consultation from './app/api/consultation/route.ts';",resolveDir:process.cwd(),loader:'ts'},outfile:'.qa/api-test.mjs',bundle:true,platform:'node',format:'esm',plugins:[{name:'local-test-only',setup(b){
@@ -24,7 +24,7 @@ test('account-owned records persist and never expose another account',async()=>{
  const saved=await (await api.POST(req())).json();assert.equal(saved.record.input.year,1995);assert.ok(saved.record.snapshot.topics.sky.length>3);
  const again=await (await api.GET()).json();assert.deepEqual(again.record,saved.record);assert.match((await api.GET()).headers.get('cache-control'),/no-store/);
  sqlite.prepare('UPDATE readings SET payload = ? WHERE owner_id = ?').run(JSON.stringify({...saved.record.snapshot,version:3}),'test-a');
- const refreshed=await (await api.GET()).json();assert.equal(refreshed.record.snapshot.version,4);assert.deepEqual(refreshed.record,saved.record);
+ const refreshed=await (await api.GET()).json();assert.equal(refreshed.record.snapshot.version,SNAPSHOT_VERSION);assert.deepEqual(refreshed.record,saved.record);
  globalThis.__testIdentity={userId:'test-b'};assert.deepEqual(await (await api.GET()).json(),{record:null});
  await api.POST(req({...raw,year:2001,ownerId:'test-a',guide:'blonde'}));
  const b=await (await api.GET()).json();assert.equal(b.record.input.year,2001);

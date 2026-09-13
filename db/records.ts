@@ -1,5 +1,5 @@
 import {env} from 'cloudflare:workers';
-import {makeSnapshot,validateBirth} from '../lib/consultation.js';
+import {makeSnapshot,validateBirth,SNAPSHOT_VERSION} from '../lib/consultation.js';
 import {koreanDate} from '../lib/engine.js';
 export function db(){if(!env.DB)throw new Error('Database unavailable');return env.DB;}
 export async function loadRecord(owner:string){
@@ -8,7 +8,7 @@ export async function loadRecord(owner:string){
  if(!profile)return null;
  const date=koreanDate();
  let row=await database.prepare('SELECT payload FROM readings WHERE owner_id = ? AND profile_version = ? AND day = ?').bind(owner,profile.version,date).first<{payload:string}>();
- if(row&&JSON.parse(row.payload).version!==4){
+ if(row&&JSON.parse(row.payload).version!==SNAPSHOT_VERSION){
    const payload=JSON.stringify(makeSnapshot(JSON.parse(profile.chart),date));
    await database.prepare('UPDATE readings SET payload = ? WHERE owner_id = ? AND profile_version = ? AND day = ?').bind(payload,owner,profile.version,date).run();row={payload};
  }
