@@ -1,0 +1,3 @@
+astronomy-engine==2.1.19
+korean-lunar-calendar==0.4.0
+tzdata==2026.4
