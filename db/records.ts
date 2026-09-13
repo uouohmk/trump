@@ -1,13 +1,17 @@
 import {env} from 'cloudflare:workers';
 import {makeSnapshot,validateBirth} from '../lib/consultation.js';
 import {koreanDate} from '../lib/engine.js';
-function db(){if(!env.DB)throw new Error('Database unavailable');return env.DB;}
+export function db(){if(!env.DB)throw new Error('Database unavailable');return env.DB;}
 export async function loadRecord(owner:string){
  const database=db();
  const profile=await database.prepare('SELECT version, input, chart, guide FROM profiles WHERE owner_id = ?').bind(owner).first<{version:string,input:string,chart:string,guide:string}>();
  if(!profile)return null;
  const date=koreanDate();
  let row=await database.prepare('SELECT payload FROM readings WHERE owner_id = ? AND profile_version = ? AND day = ?').bind(owner,profile.version,date).first<{payload:string}>();
+ if(row&&JSON.parse(row.payload).version!==3){
+   const payload=JSON.stringify(makeSnapshot(JSON.parse(profile.chart),date));
+   await database.prepare('UPDATE readings SET payload = ? WHERE owner_id = ? AND profile_version = ? AND day = ?').bind(payload,owner,profile.version,date).run();row={payload};
+ }
  if(!row){
    const payload=JSON.stringify(makeSnapshot(JSON.parse(profile.chart),date));
    await database.prepare('INSERT OR IGNORE INTO readings (owner_id, profile_version, day, payload) SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM profiles WHERE owner_id = ? AND version = ?)').bind(owner,profile.version,date,payload,owner,profile.version).run();
@@ -25,4 +29,4 @@ export async function saveRecord(owner:string,raw:unknown){
  ]);
  return {version,...value,snapshot:JSON.parse(payload)};
 }
-export async function deleteRecord(owner:string){const database=db();await database.batch([database.prepare('DELETE FROM readings WHERE owner_id = ?').bind(owner),database.prepare('DELETE FROM profiles WHERE owner_id = ?').bind(owner)]);}
+export async function deleteRecord(owner:string){const database=db();await database.batch([database.prepare('DELETE FROM readings WHERE owner_id = ?').bind(owner),database.prepare('DELETE FROM consultations WHERE owner_id = ?').bind(owner),database.prepare('DELETE FROM profiles WHERE owner_id = ?').bind(owner)]);}

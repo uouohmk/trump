@@ -8,6 +8,13 @@
       "when": 1789269416738,
       "tag": "0000_flawless_cassandra_nova",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1789270588514,
+      "tag": "0001_groovy_miss_america",
+      "breakpoints": true
     }
   ]
 }
